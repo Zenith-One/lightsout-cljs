@@ -99,13 +99,9 @@
                 (map (fn [col]
                        (let [result 
                              (every? #(= false %) col)]
-                         (prn "column" result)
                          result))
                      board))]
-    (prn "game-over-check" over?)
     over?))
-
-(prn "game-over?" (game-over? [[false false] [false false]]))
 
 (defn make-move! [c r]
   (let [next-board (flip (:board @app-state) c r)]
