@@ -208,7 +208,8 @@
 (defn lightsout []
   (let [state (:state @app-state)]
     
-    [:center
+    [:center {:style {:max-width 600
+                      :margin "0 auto"}}
      [:div
       [:h1 (case state
              :playing "Turn out the lights!"
@@ -234,21 +235,23 @@
                   "New Game")))]]]
        [:div {:class "third"}
         [:p [:strong "Time: "] (display-time (:time @app-state))]]]
+      
       (into
        [:svg {:view-box (str "0 0 " (board-size) " " (board-size))
               :width "70%"
               :height "80%"
-              :style {:margin-top "20px"}}]
+              :style {:margin-top "20px"
+                      :max-width "500px"}}]
        (for [i (range (count (:board @app-state)))
              j (range (count (:board @app-state)))]
          (case state
            :waiting (blank i j state)
            :game-over (won i j state)
            :playing            
-             (let [value (get-board-pos i j)]
-               (if value
-                 (filled i j state)
-                 (blank i j state))))))]]))
+           (let [value (get-board-pos i j)]
+             (if value
+               (filled i j state)
+               (blank i j state))))))]]))
 
 (reagent/render-component [lightsout]
                           (. js/document (getElementById "app")))
