@@ -210,9 +210,10 @@
     
     [:center
      [:div
-      [:h1 (if (= state :playing)
-             "Turn out the lights!"
-             "You did it!")]
+      [:h1 (case state
+             :playing "Turn out the lights!"
+             :game-over "You did it!"
+             "Click New Game to begin.")]
       [:div
        [:div {:class "third"}
         [:p [:strong "Moves: "] (:moves @app-state)]]
