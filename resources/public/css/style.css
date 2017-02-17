@@ -1,2 +1,22 @@
 /* some style */
+.button {
+    background-color: #f88; /* Green */
+    border: 1px solid #d55;
+    color: white;
+    padding: 15px 20px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+}
 
+.button.game-over {
+    background-color: #2a2;
+    border-color: #282;
+}
+
+.third {
+    display: inline-block;
+    width: 30%;
+    margin: 0 1%;
+}

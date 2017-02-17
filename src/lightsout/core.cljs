@@ -1,7 +1,10 @@
 (ns lightsout.core
-  (:require [reagent.core :as reagent :refer [atom]]))
+  (:require [reagent.core :as reagent :refer [atom]]
+            [goog.string :as gstring]))
 
 (enable-console-print!)
+
+(declare new-game!)
 
 (def percent-out 20)
 (def debug false)
@@ -25,13 +28,56 @@
 
 ;; define your app data so that it doesn't get over-written on reload
 
-(defonce app-state (let [board-size 8]
-                     (atom {:state :playing
-                            :board-size board-size
-                            :board (new-board board-size)})))
+(defonce app-state
+  (let [board-size 8]
+    (atom {:state :waiting
+           :board-size board-size
+           :board (new-board board-size)
+           :moves 0
+           :time 0
+           :timer 0})))
+
+(defn inc-time! []
+  (swap! app-state update-in [:time] inc))
+
+(defn tick! [next-fn]
+  (case (:state @app-state)
+    :playing (do (inc-time!)
+                (js/setTimeout next-fn 1000))
+    :starting (new-game!)
+    (println "Game over. Stopping timer.")))
+
+(defn zero-pad [s]
+  (if (< (count (str s)) 2)
+    (str "0" s)
+    s))
+
+(defn display-time [seconds]
+  (let [d (js/Date. nil)]
+    (.setHours d 0)
+    (.setSeconds d seconds)
+    (str
+     (zero-pad (.getHours d)) ":"
+     (zero-pad (.getMinutes d)) ":"
+     (zero-pad (.getSeconds d)))))
+
+(defn get-timer [id]
+  (fn []
+    (if (= (:timer @app-state) id)
+      (tick! (get-timer id))
+      (println "Not the current timer. Bailing."))))
+
+(defn start-new-game! []
+  (new-game!))
 
 (defn new-game! []
   ;; (prn "new game!")
+  (let [new-timer-id (inc (:timer @app-state))]
+    (js/setTimeout (get-timer new-timer-id)
+                   1000)
+    (swap! app-state assoc-in [:timer] new-timer-id))
+  (swap! app-state assoc-in [:moves] 0)
+  (swap! app-state assoc-in [:time] 0)
   (swap! app-state assoc-in
          [:board]
          (new-board (:board-size @app-state)))
@@ -103,28 +149,49 @@
                      board))]
     over?))
 
+
+
+(prn "game-over?" (game-over? [[false false] [false false]]))
+
 (defn make-move! [c r]
   (let [next-board (flip (:board @app-state) c r)]
     (swap! app-state assoc-in [:board] next-board)
     (swap! app-state assoc-in [:state]
            (if (game-over? next-board)
              :game-over
-             :playing))))
+             :playing))
+    (swap! app-state update-in [:moves] inc)))
 
 (defn blank [i j state]
   [:rect {:width 0.9
           :height 0.9
-          :fill "#999"
+          :fill "#888"
           :x i
           :y j
+          :stroke "#666"
+          :stroke-width 0.015
           :on-click (fn click-rect [e]
                       (if (= state :playing) (make-move! i j)))}])
 
+(defn assoc-in-multiple [base & settings-pairs]
+  (reduce (fn set-settings-pair [acc pair]
+            (assoc-in acc [(first pair)] (second pair)))
+          base
+          settings-pairs))
+
 (defn filled [i j state]
-  [:rect (assoc-in (second (blank i j state)) [:fill] "#f88")])
+  (let [settings (assoc-in-multiple
+                  (second (blank i j state))
+                  [:fill "#f88"]
+                  [:stroke "#d55"])]
+    [:rect settings]))
 
 (defn won [i j state]
-  [:rect (assoc-in (second (blank i j state)) [:fill] "#8f8")])
+  (let [settings (assoc-in-multiple
+                  (second (blank i j state))
+                  [:fill "#2a2"]
+                  [:stroke "#282"])]
+    [:rect settings]))
 
 (defn board-size []
   (:board-size @app-state))
@@ -136,6 +203,8 @@
 ;  . . x x x
 ;  x . x x .
 
+
+
 (defn lightsout []
   (let [state (:state @app-state)]
     
@@ -144,24 +213,47 @@
       [:h1 (if (= state :playing)
              "Turn out the lights!"
              "You did it!")]
-      [:div [:button
-             {:on-click #(new-game!)}
-             "Restart"]]
+      [:div
+       [:div {:class "third"}
+        [:p [:strong "Moves: "] (:moves @app-state)]]
+       [:div {:class "third"}
+        [:a {:href "#"
+             :on-click (fn [e]
+                         (.preventDefault e)
+                         (start-new-game!))
+             :class (if (or (= state :game-over)
+                            (= state :waiting))
+                      "button game-over"
+                      "button")}
+         [:i {:class "fa fa-refresh"}
+          (gstring/unescapeEntities
+           (str " &nbsp;&nbsp;"
+                (if (= state :playing)
+                  "Restart"
+                  "New Game")))]]]
+       [:div {:class "third"}
+        [:p [:strong "Time: "] (display-time (:time @app-state))]]]
       (into
        [:svg {:view-box (str "0 0 " (board-size) " " (board-size))
-              :width 500
-              :height 500}]
+              :width "70%"
+              :height "80%"
+              :style {:margin-top "20px"}}]
        (for [i (range (count (:board @app-state)))
              j (range (count (:board @app-state)))]
-         (if (= state :game-over)
-           (won i j state)
-           (let [value (get-board-pos i j)]
-             (if value
-               (filled i j state)
-               (blank i j state))))))]]))
+         (case state
+           :waiting (blank i j state)
+           :game-over (won i j state)
+           :playing            
+             (let [value (get-board-pos i j)]
+               (if value
+                 (filled i j state)
+                 (blank i j state))))))]]))
 
 (reagent/render-component [lightsout]
                           (. js/document (getElementById "app")))
+
+(defn win-game! []
+  (swap! app-state assoc-in [:state] :game-over))
 
 (defn on-js-reload []
   ;; optionally touch your app-state to force rerendering depending on
